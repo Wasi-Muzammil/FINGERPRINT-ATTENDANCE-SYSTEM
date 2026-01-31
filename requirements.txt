@@ -1,0 +1,17 @@
+# Backend (FastAPI)
+fastapi
+uvicorn
+python-multipart
+pyjwt
+python-jose
+
+# Frontend (Streamlit)
+streamlit
+
+# Shared Dependencies
+pillow
+reportlab
+bcrypt
+requests
+pandas
+pydantic
