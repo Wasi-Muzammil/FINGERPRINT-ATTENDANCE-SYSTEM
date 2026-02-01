@@ -1,0 +1,480 @@
+/* ==================== GLOBAL STYLES ==================== */
+
+:root {
+  --primary-color: #2e3192;
+  --secondary-color: #00a8e8;
+  --success-color: #51cf66;
+  --danger-color: #ff6b6b;
+  --warning-color: #ffd43b;
+  --dark-bg: #0f0f23;
+  --card-bg: #1a1a2e;
+  --sidebar-bg: #16213e;
+  --text-primary: #e8e8e8;
+  --text-secondary: #a0a0a0;
+}
+
+/* Hide Streamlit branding */
+#MainMenu {
+  visibility: hidden;
+}
+footer {
+  visibility: hidden;
+}
+
+/* Always show sidebar toggle button */
+[data-testid="collapsedControl"] {
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* Ensure sidebar toggle is visible and accessible */
+button[kind="header"] {
+  display: block !important;
+  visibility: visible !important;
+}
+
+/* Main app background */
+.stApp {
+  background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
+}
+
+/* ==================== LOGIN PAGE ==================== */
+
+.login-container {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--secondary-color) 100%
+  );
+  padding: 3rem;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.login-header {
+  color: white;
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin: 0;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.login-subheader {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.1rem;
+  margin-top: 0.5rem;
+}
+
+.login-form {
+  background: var(--card-bg);
+  padding: 2rem;
+  border-radius: 15px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* ==================== SIDEBAR ==================== */
+
+.sidebar-header {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--secondary-color) 100%
+  );
+  padding: 1.5rem;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.sidebar-header h2 {
+  color: white;
+  margin: 0;
+  font-size: 1.3rem;
+}
+
+/* Device status styling */
+.device-status {
+  display: flex;
+  align-items: center;
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  margin: 0.5rem 0;
+  font-weight: 600;
+}
+
+.device-status.online {
+  background: rgba(81, 207, 102, 0.15);
+  border: 2px solid var(--success-color);
+}
+
+.device-status.offline {
+  background: rgba(255, 107, 107, 0.15);
+  border: 2px solid var(--danger-color);
+}
+
+.status-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-right: 10px;
+  animation: pulse 2s infinite;
+}
+
+.status-dot.online-dot {
+  background: var(--success-color);
+  box-shadow: 0 0 10px var(--success-color);
+}
+
+.status-dot.offline-dot {
+  background: var(--danger-color);
+  box-shadow: 0 0 10px var(--danger-color);
+}
+
+.status-text {
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ==================== PAGE TITLE ==================== */
+
+.page-title {
+  color: var(--text-primary);
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 2rem;
+  text-align: center;
+  background: linear-gradient(
+    135deg,
+    var(--primary-color),
+    var(--secondary-color)
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ==================== METRIC CARDS ==================== */
+
+.metric-card {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--secondary-color) 100%
+  );
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  color: white;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
+  margin-bottom: 1rem; /* Mobile spacing */
+}
+
+.metric-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+}
+
+.metric-card.metric-success {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.metric-card.metric-info {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.metric-card.metric-warning {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.metric-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.metric-value {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin: 0.5rem 0;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.metric-label {
+  font-size: 0.9rem;
+  opacity: 0.95;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+/* ==================== RESPONSIVE DESIGN ==================== */
+
+/* Mobile devices */
+@media (max-width: 768px) {
+  .metric-card {
+    margin-bottom: 1.5rem !important; /* Extra spacing on mobile */
+  }
+
+  .login-header {
+    font-size: 2rem;
+  }
+
+  .page-title {
+    font-size: 1.8rem;
+  }
+
+  .metric-value {
+    font-size: 2rem;
+  }
+
+  .metric-icon {
+    font-size: 1.5rem;
+  }
+}
+
+/* Tablet devices */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .metric-card {
+    margin-bottom: 1rem;
+  }
+}
+
+/* Desktop devices */
+@media (min-width: 1025px) {
+  .metric-card {
+    margin-bottom: 0.5rem;
+  }
+}
+
+/* ==================== BUTTONS ==================== */
+
+.stButton > button {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color) 0%,
+    var(--secondary-color) 100%
+  );
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  width: 100%;
+}
+
+.stButton > button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
+}
+
+.stButton > button:active {
+  transform: translateY(0);
+}
+
+/* ==================== FORMS ==================== */
+
+.stTextInput > div > div > input,
+.stSelectbox > div > div > select,
+.stTextArea > div > div > textarea {
+  background: var(--card-bg);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 0.75rem;
+  transition: border-color 0.3s ease;
+}
+
+.stTextInput > div > div > input:focus,
+.stSelectbox > div > div > select:focus,
+.stTextArea > div > div > textarea:focus {
+  border-color: var(--secondary-color);
+  box-shadow: 0 0 0 2px rgba(0, 168, 232, 0.2);
+}
+
+/* ==================== TABS ==================== */
+
+.stTabs [data-baseweb="tab-list"] {
+  gap: 8px;
+  background: var(--card-bg);
+  padding: 0.5rem;
+  border-radius: 10px;
+}
+
+.stTabs [data-baseweb="tab"] {
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.stTabs [data-baseweb="tab"]:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.stTabs [aria-selected="true"] {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color),
+    var(--secondary-color)
+  );
+  color: white !important;
+}
+
+/* ==================== DATA TABLES ==================== */
+
+.stDataFrame {
+  background: var(--card-bg);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.stDataFrame table {
+  color: var(--text-primary);
+}
+
+.stDataFrame thead tr {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color),
+    var(--secondary-color)
+  );
+  color: white;
+}
+
+.stDataFrame tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.stDataFrame tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ==================== ALERTS ==================== */
+
+.stSuccess,
+.stError,
+.stWarning,
+.stInfo {
+  border-radius: 10px;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.stSuccess {
+  background: rgba(81, 207, 102, 0.15);
+  border-left: 4px solid var(--success-color);
+}
+
+.stError {
+  background: rgba(255, 107, 107, 0.15);
+  border-left: 4px solid var(--danger-color);
+}
+
+.stWarning {
+  background: rgba(255, 212, 59, 0.15);
+  border-left: 4px solid var(--warning-color);
+}
+
+.stInfo {
+  background: rgba(0, 168, 232, 0.15);
+  border-left: 4px solid var(--secondary-color);
+}
+
+/* ==================== LOADING SPINNER ==================== */
+
+.stSpinner > div {
+  border-top-color: var(--secondary-color) !important;
+}
+
+/* ==================== DOWNLOAD BUTTON ==================== */
+
+.stDownloadButton > button {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+  color: white;
+  border: none;
+  padding: 0.75rem 2rem;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.stDownloadButton > button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(17, 153, 142, 0.4);
+}
+
+/* ==================== SCROLLBAR ==================== */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--dark-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    135deg,
+    var(--primary-color),
+    var(--secondary-color)
+  );
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary-color);
+}
+
+/* ==================== MOBILE FIXES ==================== */
+
+/* Ensure proper spacing on mobile */
+@media (max-width: 768px) {
+  .stApp {
+    padding: 1rem;
+  }
+
+  /* Fix column gaps on mobile */
+  .row-widget.stHorizontal > div {
+    margin-bottom: 1rem;
+  }
+
+  /* Stack columns on mobile */
+  [data-testid="column"] {
+    margin-bottom: 1rem;
+  }
+}
+
+/* ==================== OPTION MENU (NAVIGATION) ==================== */
+
+.nav-link {
+  transition: all 0.3s ease !important;
+}
+
+.nav-link:hover {
+  transform: translateY(-2px);
+}
+
+.nav-link-selected {
+  box-shadow: 0 4px 10px rgba(46, 49, 146, 0.4) !important;
+}

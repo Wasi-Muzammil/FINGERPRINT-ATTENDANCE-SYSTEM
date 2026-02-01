@@ -1,9 +1,3 @@
-# Backend (FastAPI)
-fastapi
-uvicorn
-python-multipart
-pyjwt
-python-jose
 
 # Frontend (Streamlit)
 streamlit
@@ -11,7 +5,26 @@ streamlit
 # Shared Dependencies
 pillow
 reportlab
-bcrypt
 requests
 pandas
-pydantic
+
+
+# Streamlit Framework
+streamlit
+streamlit-option-menu
+
+# Database & ORM
+sqlalchemy
+psycopg2-binary
+
+# PDF Generation
+reportlab
+
+# API Communication
+requests
+
+# Data Processing
+pandas
+
+# Utilities
+python-dateutil

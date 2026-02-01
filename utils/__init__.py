@@ -1,17 +1,21 @@
-# Utils package initializer
-from .database import Database
-from .auth import Authentication, check_authentication, logout
-from .pdf_generator import PDFGenerator
-from .esp32_api import esp32_api, enroll_fingerprint, delete_fingerprint, fetch_live_attendance
+
+"""
+Utils package for Fingerprint Attendance System
+Provides database, API, and PDF management modules
+"""
+
+from .db_manager import DatabaseManager, UserInformationDB, AttendanceRecordDB, DeviceStatusDB,AdminInformationDB
+from .api_client import APIClient
+from .pdf_manager import PDFManager
 
 __all__ = [
-    'Database',
-    'Authentication',
-    'check_authentication',
-    'logout',
-    'PDFGenerator',
-    'esp32_api',
-    'enroll_fingerprint',
-    'delete_fingerprint',
-    'fetch_live_attendance'
+    'DatabaseManager',
+    'UserInformationDB',
+    'AttendanceRecordDB',
+    'DeviceStatusDB',
+    'AdminInformationDB',
+    'APIClient',
+    'PDFManager'
 ]
+
+__version__ = '2.0.0'

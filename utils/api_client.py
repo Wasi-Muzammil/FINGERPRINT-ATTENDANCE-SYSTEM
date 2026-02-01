@@ -1,409 +1,421 @@
+
+"""
+API Client for FastAPI Backend
+Aligned with actual backend endpoints from main.py
+"""
+
 import requests
-from typing import Optional, Dict, Any, List, Tuple
-import streamlit as st
+from typing import Optional, Dict, Any, Tuple, List
+from datetime import datetime
 
 class APIClient:
     """Client for communicating with FastAPI backend"""
     
-    def __init__(self, base_url: str = "http://localhost:8000"):
-        self.base_url = base_url
+    def __init__(self, base_url: str):
+        """
+        Initialize API client
+        
+        Args:
+            base_url: Base URL of the FastAPI backend (from secrets)
+        """
+        self.base_url = base_url.rstrip('/')
         self.token = None
+        self.timeout = 30
     
     def _get_headers(self) -> Dict[str, str]:
-        """Get request headers with authentication token"""
+        """Get request headers"""
         headers = {"Content-Type": "application/json"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         return headers
     
-    def _handle_response(self, response: requests.Response) -> Tuple[bool, Any]:
-        """Handle API response"""
+    # ==================== AUTHENTICATION ====================
+    
+    def login(self, username: str, password: str) -> Tuple[bool, Optional[str]]:
+        """
+        Login to backend - validates credentials against admin_information table
+        
+        Args:
+            username: Admin username
+            password: Admin password
+        
+        Returns:
+            Tuple of (success, token or error_message)
+        """
         try:
-            if response.status_code in [200, 201]:
-                return True, response.json()
-            elif response.status_code == 401:
-                # Token expired or invalid
-                self.token = None
-                if 'authenticated' in st.session_state:
-                    st.session_state.authenticated = False
-                return False, "Authentication failed. Please login again."
+            response = requests.post(
+                f"{self.base_url}/esp32/user/admin/login",
+                json={"username": username, "password": password},
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('success'):
+                    self.token = data.get('token', 'authenticated')
+                    return True, self.token
+                else:
+                    return False, data.get('message', 'Invalid credentials')
             else:
-                error_detail = response.json().get('detail', 'Unknown error')
-                return False, error_detail
+                return False, "Invalid credentials"
+                
+        except requests.exceptions.RequestException as e:
+            return False, f"Connection error: {str(e)}"
+    
+    def verify_token(self) -> bool:
+        """Verify if session is valid"""
+        # Since backend doesn't have JWT, we just check if we have a token
+        return self.token is not None
+    
+    def logout(self) -> None:
+        """Logout and clear token"""
+        self.token = None
+    
+    # ==================== HEALTH CHECK ====================
+    
+    def health_check(self) -> bool:
+        """Check if backend is reachable"""
+        try:
+            response = requests.get(
+                f"{self.base_url}/health",
+                timeout=5
+            )
+            return response.status_code == 200
+        except:
+            return False
+    
+    # ==================== USER MANAGEMENT ====================
+    
+    def get_all_users(self) -> Tuple[bool, Any]:
+        """
+        Get all users from backend
+        Endpoint: GET /esp32/users
+        """
+        try:
+            response = requests.get(
+                f"{self.base_url}/esp32/user/esp32/users",
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                return False, f"Error: {response.status_code}"
+                
         except Exception as e:
             return False, str(e)
     
-    # ==================== AUTHENTICATION ====================
-    
-    def login(self, username: str, password: str) -> Tuple[bool, str]:
-        """Login to get access token"""
+    def get_user_by_id(self, user_id: int) -> Tuple[bool, Any]:
+        """
+        Get specific user by user_id
+        Endpoint: GET /esp32/user/{user_id}
+        """
         try:
+            response = requests.get(
+                f"{self.base_url}/esp32/user/esp32/user/{user_id}",
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                return False, None
+                
+        except Exception as e:
+            return False, None
+    
+    def update_user(
+        self,
+        user_id: int,
+        name: Optional[str] = None,
+        slot_ids: Optional[List[int]] = None,
+        date: Optional[str] = None,
+        time: Optional[str] = None
+    ) -> Tuple[bool, str]:
+        """
+        Update user via API
+        Endpoint: PUT /admin/user/update
+        
+        Args:
+            user_id: User ID
+            name: Updated name
+            slot_ids: Updated slot IDs list
+            date: Updated enrollment date
+            time: Updated enrollment time
+        
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            data = {"user_id": user_id}
+            
+            if name:
+                data['name'] = name
+            if slot_ids is not None:
+                data['slot_id'] = slot_ids
+            if date:
+                data['date'] = date
+            if time:
+                data['time'] = time
+            
+            response = requests.put(
+                f"{self.base_url}/esp32/user/admin/user/update",
+                json=data,
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    return True, result.get('message', 'User updated successfully')
+                else:
+                    return False, result.get('message', 'Update failed')
+            else:
+                error = response.json().get('detail', 'Update failed')
+                return False, error
+                
+        except Exception as e:
+            return False, str(e)
+    
+    def create_user(
+        self,
+        name: str,
+        user_id: int,
+        slot_ids: List[int],
+        date: str,
+        time: str
+    ) -> Tuple[bool, str]:
+        """
+        Create new user
+        Endpoint: POST /esp32/user
+        """
+        try:
+            data = {
+                "name": name,
+                "id": user_id,
+                "slot_id": slot_ids,
+                "date": date,
+                "time": time
+            }
+            
             response = requests.post(
-                f"{self.base_url}/api/auth/login",
-                json={"username": username, "password": password},
+                f"{self.base_url}/esp32/user/esp32/user",
+                json=data,
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    return True, result.get('message', 'User created successfully')
+                else:
+                    return False, result.get('message', 'Creation failed')
+            else:
+                return False, "Creation failed"
+                
+        except Exception as e:
+            return False, str(e)
+    
+    def delete_user(
+        self,
+        user_id: int,
+        slot_ids: List[int]
+    ) -> Tuple[bool, str]:
+        """
+        Delete user
+        Endpoint: DELETE /esp32/user/delete
+        """
+        try:
+            data = {
+                "user_id": user_id,
+                "slot_id": slot_ids
+            }
+            
+            response = requests.delete(
+                f"{self.base_url}/esp32/user/esp32/user/delete",
+                json=data,
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    return True, result.get('message', 'User deleted successfully')
+                else:
+                    return False, result.get('message', 'Deletion failed')
+            else:
+                return False, "Deletion failed"
+                
+        except Exception as e:
+            return False, str(e)
+    
+    # ==================== DEVICE STATUS ====================
+    
+    def get_device_status(self, device_id: str = "ESP32_MAIN") -> Optional[Dict]:
+        """
+        Get ESP32 device status from API
+        Endpoint: GET /esp32/status/{device_id}
+        
+        Returns:
+            Device status dictionary or None
+        """
+        try:
+            response = requests.get(
+                f"{self.base_url}/esp32/esp32/status/{device_id}",
                 timeout=10
             )
             
             if response.status_code == 200:
                 data = response.json()
-                self.token = data['access_token']
-                return True, "Login successful"
+                return {
+                    'connected': data.get('is_online', False),
+                    'status': data.get('status', 'Offline'),
+                    'last_seen': data.get('last_seen', 'Unknown'),
+                    'device_id': data.get('device_id', device_id)
+                }
             else:
-                return False, "Invalid username or password"
+                return {
+                    'connected': False,
+                    'status': 'Offline',
+                    'last_seen': 'Unknown',
+                    'device_id': device_id
+                }
+                
         except Exception as e:
-            return False, f"Connection error: {str(e)}"
-    
-    def verify_token(self) -> bool:
-        """Verify if current token is valid"""
-        try:
-            response = requests.get(
-                f"{self.base_url}/api/auth/verify",
-                headers=self._get_headers(),
-                timeout=5
-            )
-            return response.status_code == 200
-        except:
-            return False
-    
-    def logout(self) -> Tuple[bool, str]:
-        """Logout (clear token)"""
-        try:
-            requests.post(
-                f"{self.base_url}/api/auth/logout",
-                headers=self._get_headers(),
-                timeout=5
-            )
-        except:
-            pass
-        
-        self.token = None
-        return True, "Logged out successfully"
-    
-    # ==================== USER MANAGEMENT ====================
-    
-    def create_user(self, name: str, department: str, 
-                   fingerprint_id: Optional[int] = None,
-                   image_file = None) -> Tuple[bool, Any]:
-        """Create a new user"""
-        try:
-            files = {}
-            data = {
-                "name": name,
-                "department": department
+            return {
+                'connected': False,
+                'status': 'Offline',
+                'last_seen': 'Unknown',
+                'device_id': device_id,
+                'error': str(e)
             }
-            
-            if fingerprint_id:
-                data["fingerprint_id"] = fingerprint_id
-            
-            if image_file:
-                files["image"] = image_file
-            
-            response = requests.post(
-                f"{self.base_url}/api/users",
-                data=data,
-                files=files if files else None,
-                headers={"Authorization": f"Bearer {self.token}"},
-                timeout=30
-            )
-            
-            return self._handle_response(response)
-        except Exception as e:
-            return False, str(e)
     
-    def get_all_users(self) -> Tuple[bool, List[Dict]]:
-        """Get all users"""
+    def get_all_devices_status(self) -> Optional[Dict]:
+        """
+        Get status of all devices
+        Endpoint: GET /esp32/status
+        """
         try:
             response = requests.get(
-                f"{self.base_url}/api/users",
-                headers=self._get_headers(),
-                timeout=10
-            )
-            return self._handle_response(response)
-        except Exception as e:
-            return False, str(e)
-    
-    def get_user(self, user_id: int) -> Tuple[bool, Dict]:
-        """Get user by ID"""
-        try:
-            response = requests.get(
-                f"{self.base_url}/api/users/{user_id}",
-                headers=self._get_headers(),
-                timeout=10
-            )
-            return self._handle_response(response)
-        except Exception as e:
-            return False, str(e)
-    
-    def update_user(self, user_id: int, name: Optional[str] = None,
-                   department: Optional[str] = None,
-                   fingerprint_id: Optional[int] = None) -> Tuple[bool, str]:
-        """Update user information"""
-        try:
-            data = {}
-            if name:
-                data["name"] = name
-            if department:
-                data["department"] = department
-            if fingerprint_id is not None:
-                data["fingerprint_id"] = fingerprint_id
-            
-            response = requests.put(
-                f"{self.base_url}/api/users/{user_id}",
-                json=data,
-                headers=self._get_headers(),
-                timeout=10
+                f"{self.base_url}/esp32/esp32/status",
+                timeout=self.timeout
             )
             
-            success, result = self._handle_response(response)
-            if success:
-                return True, result.get('message', 'User updated')
-            return False, result
+            if response.status_code == 200:
+                return response.json()
+            else:
+                return None
+                
         except Exception as e:
-            return False, str(e)
-    
-    def delete_user(self, user_id: int) -> Tuple[bool, str]:
-        """Delete user"""
-        try:
-            response = requests.delete(
-                f"{self.base_url}/api/users/{user_id}",
-                headers=self._get_headers(),
-                timeout=10
-            )
-            
-            success, result = self._handle_response(response)
-            if success:
-                return True, result.get('message', 'User deleted')
-            return False, result
-        except Exception as e:
-            return False, str(e)
-    
-    def get_user_image_url(self, user_id: int) -> str:
-        """Get user image URL"""
-        return f"{self.base_url}/api/users/{user_id}/image?token={self.token}"
+            return None
     
     # ==================== ATTENDANCE ====================
     
-    def create_attendance(self, user_id: int, status: str,
-                         timestamp: Optional[str] = None) -> Tuple[bool, str]:
-        """Create attendance record"""
+    def get_attendance_by_date(self, date_str: str) -> Tuple[bool, Any]:
+        """
+        Get attendance for specific date (DD/MM format)
+        Endpoint: GET /esp32/attendance/date/{date}
+        """
+        try:
+            response = requests.get(
+                f"{self.base_url}/esp32/atendance/esp32/attendance/date/{date_str}",
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                return False, None
+                
+        except Exception as e:
+            return False, None
+    
+    def get_user_attendance(self, user_id: int, date: str) -> Tuple[bool, Any]:
+        """
+        Get attendance for specific user and date
+        Endpoint: GET /esp32/attendance/{user_id}/{date}
+        """
+        try:
+            response = requests.get(
+                f"{self.base_url}/esp32/attendance/esp32/attendance/{user_id}/{date}",
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 200:
+                return True, response.json()
+            else:
+                return False, None
+                
+        except Exception as e:
+            return False, None
+    
+    def log_attendance(
+        self,
+        name: str,
+        user_id: int,
+        slot_ids: List[int],
+        date: str,
+        time: str
+    ) -> Tuple[bool, str]:
+        """
+        Log attendance record
+        Endpoint: POST /esp32/attendance
+        """
         try:
             data = {
-                "user_id": user_id,
-                "status": status
+                "name": name,
+                "id": user_id,
+                "slot_id": slot_ids,
+                "date": date,
+                "time": time
             }
-            if timestamp:
-                data["timestamp"] = timestamp
             
             response = requests.post(
-                f"{self.base_url}/api/attendance",
+                f"{self.base_url}/esp32/attendance/esp32/attendance",
                 json=data,
-                headers=self._get_headers(),
-                timeout=10
-            )
-            
-            success, result = self._handle_response(response)
-            if success:
-                return True, result.get('message', 'Attendance recorded')
-            return False, result
-        except Exception as e:
-            return False, str(e)
-    
-    def get_attendance_by_date(self, date_str: str) -> Tuple[bool, Any]:
-        """Get attendance for a specific date"""
-        try:
-            response = requests.get(
-                f"{self.base_url}/api/attendance/date/{date_str}",
-                headers=self._get_headers(),
-                timeout=10
-            )
-            return self._handle_response(response)
-        except Exception as e:
-            return False, str(e)
-    
-    def get_attendance_by_range(self, start_date: str, end_date: str) -> Tuple[bool, Any]:
-        """Get attendance for date range"""
-        try:
-            response = requests.post(
-                f"{self.base_url}/api/attendance/date-range",
-                json={"start_date": start_date, "end_date": end_date},
-                headers=self._get_headers(),
-                timeout=10
-            )
-            return self._handle_response(response)
-        except Exception as e:
-            return False, str(e)
-    
-    def get_user_attendance(self, user_id: int) -> Tuple[bool, Any]:
-        """Get all attendance for a user"""
-        try:
-            response = requests.get(
-                f"{self.base_url}/api/attendance/user/{user_id}",
-                headers=self._get_headers(),
-                timeout=10
-            )
-            return self._handle_response(response)
-        except Exception as e:
-            return False, str(e)
-    
-    def get_attendance_summary(self, start_date: str, end_date: str) -> Tuple[bool, Any]:
-        """Get attendance summary with working hours"""
-        try:
-            response = requests.get(
-                f"{self.base_url}/api/attendance/summary",
-                params={"start_date": start_date, "end_date": end_date},
-                headers=self._get_headers(),
-                timeout=10
-            )
-            return self._handle_response(response)
-        except Exception as e:
-            return False, str(e)
-    
-    # ==================== PDF REPORTS ====================
-    
-    def download_daily_report(self, date_str: str) -> Tuple[bool, Any]:
-        """Download daily PDF report"""
-        try:
-            response = requests.get(
-                f"{self.base_url}/api/reports/daily/{date_str}",
-                headers=self._get_headers(),
-                timeout=30
+                timeout=self.timeout
             )
             
             if response.status_code == 200:
-                return True, response.content
+                result = response.json()
+                if result.get('success'):
+                    return True, result.get('message', 'Attendance logged')
+                else:
+                    return False, result.get('message', 'Logging failed')
             else:
-                return False, "Failed to generate report"
-        except Exception as e:
-            return False, str(e)
-    
-    def download_range_report(self, start_date: str, end_date: str) -> Tuple[bool, Any]:
-        """Download date range PDF report"""
-        try:
-            response = requests.post(
-                f"{self.base_url}/api/reports/range",
-                json={"start_date": start_date, "end_date": end_date},
-                headers=self._get_headers(),
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                return True, response.content
-            else:
-                return False, "Failed to generate report"
-        except Exception as e:
-            return False, str(e)
-    
-    def download_user_report(self, user_id: int) -> Tuple[bool, Any]:
-        """Download user PDF report"""
-        try:
-            response = requests.get(
-                f"{self.base_url}/api/reports/user/{user_id}",
-                headers=self._get_headers(),
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                return True, response.content
-            else:
-                return False, "Failed to generate report"
-        except Exception as e:
-            return False, str(e)
-    
-    # ==================== ESP32 INTEGRATION ====================
-    
-    def enroll_fingerprint(self, user_id: int, fingerprint_id: int) -> Tuple[bool, str]:
-        """Enroll fingerprint on ESP32"""
-        try:
-            response = requests.post(
-                f"{self.base_url}/api/fingerprint/enroll",
-                json={"user_id": user_id, "fingerprint_id": fingerprint_id},
-                headers=self._get_headers(),
-                timeout=30
-            )
-            
-            success, result = self._handle_response(response)
-            if success:
-                return True, result.get('message', 'Fingerprint enrolled')
-            return False, result
-        except Exception as e:
-            return False, str(e)
-    
-    def delete_fingerprint(self, fingerprint_id: int) -> Tuple[bool, str]:
-        """Delete fingerprint from ESP32"""
-        try:
-            response = requests.delete(
-                f"{self.base_url}/api/fingerprint/{fingerprint_id}",
-                headers=self._get_headers(),
-                timeout=10
-            )
-            
-            success, result = self._handle_response(response)
-            if success:
-                return True, result.get('message', 'Fingerprint deleted')
-            return False, result
-        except Exception as e:
-            return False, str(e)
-    
-    def get_esp32_status(self) -> Tuple[bool, Dict]:
-        """Get ESP32 device status"""
-        try:
-            response = requests.get(
-                f"{self.base_url}/api/esp32/status",
-                headers=self._get_headers(),
-                timeout=10
-            )
-            return self._handle_response(response)
-        except Exception as e:
-            return False, {"connected": False, "message": str(e)}
-    
-    def sync_esp32_attendance(self) -> Tuple[bool, Any]:
-        """Sync attendance from ESP32"""
-        try:
-            response = requests.get(
-                f"{self.base_url}/api/esp32/sync",
-                headers=self._get_headers(),
-                timeout=30
-            )
-            return self._handle_response(response)
-        except Exception as e:
-            return False, str(e)
-    
-    def get_live_attendance(self) -> Tuple[bool, Any]:
-        """Get live attendance from ESP32"""
-        try:
-            response = requests.get(
-                f"{self.base_url}/api/esp32/live",
-                headers=self._get_headers(),
-                timeout=10
-            )
-            return self._handle_response(response)
+                return False, "Logging failed"
+                
         except Exception as e:
             return False, str(e)
     
     # ==================== STATISTICS ====================
     
-    def get_dashboard_stats(self) -> Tuple[bool, Dict]:
-        """Get dashboard statistics"""
+    def get_dashboard_stats(self) -> Optional[Dict]:
+        """
+        Get dashboard statistics
+        Endpoint: GET /admin/stats/dashboard
+        """
         try:
             response = requests.get(
-                f"{self.base_url}/api/stats/dashboard",
-                headers=self._get_headers(),
-                timeout=10
+                f"{self.base_url}/esp32/user/admin/stats/dashboard",
+                timeout=self.timeout
             )
-            return self._handle_response(response)
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                # Return default stats if endpoint doesn't exist yet
+                return {
+                    'total_users': 0,
+                    'today_records': 0,
+                    'checked_in': 0,
+                    'checked_out': 0
+                }
+                
         except Exception as e:
-            return False, str(e)
-    
-    # ==================== HEALTH CHECK ====================
-    
-    def health_check(self) -> bool:
-        """Check if API is reachable"""
-        try:
-            response = requests.get(f"{self.base_url}/health", timeout=5)
-            return response.status_code == 200
-        except:
-            return False
-
-
-# Singleton instance
-api_client = APIClient()
+            return {
+                'total_users': 0,
+                'today_records': 0,
+                'checked_in': 0,
+                'checked_out': 0
+            }
