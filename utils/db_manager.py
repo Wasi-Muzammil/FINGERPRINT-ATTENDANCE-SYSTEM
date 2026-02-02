@@ -37,6 +37,7 @@ class UserInformationDB(Base):
     slot_id = Column(PG_ARRAY(Integer), nullable=False)  # Array of slot IDs
     date = Column(String, nullable=False)  # DD/MM format
     time = Column(String, nullable=False)  # HH:MM:SS format
+    salary = Column(Numeric, nullable=True, default=None)
     created_at = Column(DateTime, default=datetime.now)
 
 class AttendanceRecordDB(Base):
@@ -127,6 +128,7 @@ class DatabaseManager:
                     'slot_id': user.slot_id or [],
                     'date': user.date,
                     'time': user.time,
+                    'salary': user.salary,
                     'created_at': user.created_at
                 })
             
@@ -157,6 +159,7 @@ class DatabaseManager:
                 'slot_id': user.slot_id or [],
                 'date': user.date,
                 'time': user.time,
+                'salary': user.salary,
                 'created_at': user.created_at
             }
             
@@ -164,6 +167,19 @@ class DatabaseManager:
             print(f"Error fetching user: {e}")
             return None
     
+    def _attach_salary(self, session, df: pd.DataFrame) -> pd.DataFrame:
+            """Attach salary without changing attendance logic"""
+            if df.empty:
+                return df
+
+            salaries = {
+                u.user_id: u.salary
+                for u in session.query(UserInformationDB.user_id, UserInformationDB.salary).all()
+            }
+
+            df['salary'] = df['user_id'].map(salaries)
+            return df
+
     # ==================== ATTENDANCE OPERATIONS ====================
     
     def get_attendance_by_date(self, date_str: str) -> Optional[pd.DataFrame]:

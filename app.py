@@ -272,13 +272,13 @@ def manage_users_tab():
         st.info("ℹ️ No users found in the system.")
         return
     
-    # Convert to DataFrame for display
     df_data = []
     for user in users_list:
         df_data.append({
             'User ID': user['user_id'],
             'Name': user['name'],
             'Slot IDs': ', '.join(map(str, user['slot_id'])),
+            'Salary (Daily)': user.get('salary') if user.get('salary') is not None else "",
             'Templates': user['total_templates'],
             'Enrolled': user['date'],
             'Time': user['time']
@@ -312,9 +312,14 @@ def manage_users_tab():
                 
                 with col1:
                     new_name = st.text_input("Name", value=selected_user_data['name'])
-                
+                    new_salary = st.number_input(
+                        "Salary (Daily)",
+                        min_value=0.0,
+                        value=float(selected_user_data['salary']) if selected_user_data.get('salary') is not None else 0.0,
+                        step=100.0
+                    )
+
                 with col2:
-                    # Slot IDs as comma-separated
                     current_slots = selected_user_data.get('slot_id', [])
                     slot_ids_str = ', '.join(map(str, current_slots)) if current_slots else ''
                     new_slot_ids = st.text_input("Slot IDs (comma-separated)", value=slot_ids_str)
@@ -332,10 +337,11 @@ def manage_users_tab():
                     # Call API to update user
                     with st.spinner("Updating user..."):
                         success, message = api_client.update_user(
-                            user_id=user_id,
-                            name=new_name,
-                            slot_ids=slot_ids_list
-                        )
+                        user_id=user_id,
+                        name=new_name,
+                        slot_ids=slot_ids_list,
+                        salary=new_salary if new_salary > 0 else None
+                    )
                     
                     if success:
                         st.success(f"✅ {message}")
