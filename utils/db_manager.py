@@ -37,7 +37,7 @@ class UserInformationDB(Base):
     slot_id = Column(PG_ARRAY(Integer), nullable=False)  # Array of slot IDs
     date = Column(String, nullable=False)  # DD/MM format
     time = Column(String, nullable=False)  # HH:MM:SS format
-    salary = Column(Numeric,nullable=True,default= Null)
+    salary = Column(Numeric(precision=10, scale=2),nullable=True,default= Null)
     created_at = Column(DateTime, default=datetime.now)
 
 class AttendanceRecordDB(Base):
