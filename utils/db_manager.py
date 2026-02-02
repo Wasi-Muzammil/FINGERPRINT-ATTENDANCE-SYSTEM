@@ -4,7 +4,7 @@ Database Manager for PostgreSQL
 Uses SQLAlchemy ORM - Models aligned with FastAPI backend
 """
 
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean,Numeric,Null
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, Boolean,Numeric
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
@@ -37,7 +37,7 @@ class UserInformationDB(Base):
     slot_id = Column(PG_ARRAY(Integer), nullable=False)  # Array of slot IDs
     date = Column(String, nullable=False)  # DD/MM format
     time = Column(String, nullable=False)  # HH:MM:SS format
-    salary = Column(Numeric(precision=10, scale=2),nullable=True,default= Null)
+    salary = Column(Numeric(precision=10, scale=2),nullable=True,default= None)
     created_at = Column(DateTime, default=datetime.now)
 
 class AttendanceRecordDB(Base):
