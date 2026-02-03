@@ -787,32 +787,25 @@
 
 
 
-
-
-
-
-
 """
 PDF Manager - Modular PDF generation with ReportLab
 Zero Streamlit dependencies
+✅ WITH SALARY CALCULATIONS INTEGRATED
 """
 
-from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from datetime import datetime,time
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from datetime import datetime, time as dt_time, timedelta
 import io
 import pandas as pd
 from typing import Optional
 
-START_TIME = time(9, 15)
-
 class PDFManager:
-    """Manages all PDF generation operations"""
-    WORK_HOURS_PER_DAY = 8
+    """Manages all PDF generation operations with salary calculations"""
     
     def __init__(self):
         """Initialize PDF manager with styles"""
@@ -852,6 +845,9 @@ class PDFManager:
         # Late arrival highlight color
         self.late_color = colors.HexColor('#ff6b6b')
         self.on_time_color = colors.HexColor('#51cf66')
+        
+        # ✅ Standard work hours (9:15 AM is the start time)
+        self.standard_start_time = dt_time(9, 15)  # 9:15 AM
     
     def _create_header(self, title: str, subtitle: str = None) -> list:
         """Create PDF header with title and subtitle"""
@@ -878,19 +874,13 @@ class PDFManager:
         
         return story
     
-    def _calculate_total_salary(self, salary, hours_str):
-        if salary is None or hours_str == "N/A":
-            return ""
-        try:
-            hours = float(hours_str.replace("h", ""))
-            return f"{(salary / self.WORK_HOURS_PER_DAY) * hours:.2f}"
-        except:
-            return ""
-
-    def _calculate_hours(self, check_in, check_out) -> str:
-        """Calculate working hours between check-in and check-out"""
+    def _calculate_hours(self, check_in, check_out) -> float:
+        """
+        Calculate working hours between check-in and check-out
+        Returns float hours (e.g., 8.5) or 0 if invalid
+        """
         if pd.isna(check_in) or pd.isna(check_out) or check_in is None or check_out is None:
-            return "N/A"
+            return 0.0
         
         try:
             # Handle time strings in HH:MM format
@@ -911,200 +901,481 @@ class PDFManager:
             
             # Handle overnight shifts
             if dt_out < dt_in:
-                dt_out = datetime.combine(today, check_out_time) + pd.Timedelta(days=1)
+                dt_out = dt_out + timedelta(days=1)
             
             hours = (dt_out - dt_in).total_seconds() / 3600
-            return f"{hours:.2f}h"
+            return hours
         except:
-            return "N/A"
+            return 0.0
     
-    def generate_daily_report(self, attendance_data: pd.DataFrame, date_str: str, user_name: Optional[str] = None):
+    def _format_hours(self, hours: float) -> str:
+        """Format hours as string"""
+        return f"{hours:.2f}h" if hours > 0 else "N/A"
+    
+    def _is_late_arrival(self, check_in) -> bool:
+        """
+        Check if check-in time is after 9:15 AM
+        ✅ Returns True if late, False otherwise
+        """
+        if pd.isna(check_in) or check_in is None or check_in == 'N/A':
+            return False
+        
+        try:
+            if isinstance(check_in, str):
+                check_in_time = datetime.strptime(check_in, "%H:%M").time()
+            else:
+                check_in_time = check_in
+            
+            return check_in_time > self.standard_start_time
+        except:
+            return False
+    
+    def _calculate_daily_salary(self, salary: float, check_in, check_out) -> float:
+        """
+        ✅ Calculate daily salary based on hours worked
+        Formula: (Daily Salary / 8) * Hours Worked
+        
+        Args:
+            salary: Daily salary
+            check_in: Check-in time
+            check_out: Check-out time
+        
+        Returns:
+            Calculated salary for the day
+        """
+        if salary is None or salary <= 0:
+            return 0.0
+        
+        hours_worked = self._calculate_hours(check_in, check_out)
+        
+        if hours_worked <= 0:
+            return 0.0
+        
+        # Formula: (Salary / 8) * hours_worked
+        hourly_rate = salary / 8.0
+        daily_total = hourly_rate * hours_worked
+        
+        return daily_total
+    
+    def generate_daily_report(
+        self,
+        attendance_data: pd.DataFrame,
+        date_str: str,
+        user_name: Optional[str] = None
+    ) -> Optional[bytes]:
+        """
+        ✅ Generate daily attendance PDF report WITH SALARY
+        
+        Args:
+            attendance_data: DataFrame with attendance records (must include 'salary' column)
+            date_str: Date in DD/MM format
+            user_name: Optional user name filter
+        
+        Returns:
+            PDF as bytes or None if failed
+        """
         try:
             buffer = io.BytesIO()
-            doc = SimpleDocTemplate(buffer, pagesize=A4, margin=36)
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=A4,
+                topMargin=0.5*inch,
+                bottomMargin=0.5*inch,
+                leftMargin=0.5*inch,
+                rightMargin=0.5*inch
+            )
+            
             story = []
-
+            
+            # Header
+            title = "Daily Attendance Report"
             subtitle = f"<b>Date:</b> {date_str}"
             if user_name:
                 subtitle += f" | <b>User:</b> {user_name}"
-
-            story.extend(self._create_header("Daily Attendance Report", subtitle))
-
-            table_data = [['#', 'Name', 'Date', 'Check In', 'Check Out', 'Status', 'Salary', 'Total']]
-
+            
+            story.extend(self._create_header(title, subtitle))
+            
+            # ✅ Prepare table data with SALARY and TOTAL columns
+            table_data = [['#', 'Name', 'Date', 'Check In', 'Check Out', 'Hours', 'Salary', 'Total', 'Status']]
+            
+            total_salary_sum = 0.0
+            
             for idx, row in attendance_data.iterrows():
-                hours = self._calculate_hours(row.get('checked_in_time'), row.get('checked_out_time'))
+                # Format times
+                check_in_time = row.get('checked_in_time', 'N/A')
+                check_out_time = row.get('checked_out_time', 'N/A')
+                status = "Present" if row.get('is_present', False) else "Absent"
+                
+                # Calculate hours
+                hours = self._calculate_hours(check_in_time, check_out_time)
+                hours_str = self._format_hours(hours)
+                
+                # ✅ Get salary and calculate total
                 salary = row.get('salary')
-                total = self._calculate_total_salary(salary, hours)
-
+                salary_str = f"{float(salary):.2f}" if salary is not None and salary > 0 else ""
+                
+                daily_total = self._calculate_daily_salary(salary, check_in_time, check_out_time)
+                total_str = f"{daily_total:.2f}" if daily_total > 0 else ""
+                
+                if daily_total > 0:
+                    total_salary_sum += daily_total
+                
                 table_data.append([
-                    idx + 1,
-                    row['name'],
-                    row['date'],
-                    row.get('checked_in_time') or 'N/A',
-                    row.get('checked_out_time') or 'N/A',
-                    "Present" if row.get('is_present') else "Absent",
-                    "" if salary is None else f"{salary:.2f}",
-                    total
+                    str(idx + 1),
+                    str(row['name']),
+                    str(row['date']),
+                    check_in_time if check_in_time and check_in_time != 'N/A' else 'N/A',
+                    check_out_time if check_out_time and check_out_time != 'N/A' else 'N/A',
+                    hours_str,
+                    salary_str,
+                    total_str,
+                    status
                 ])
-
-            table = Table(table_data, repeatRows=1)
-            table.setStyle(TableStyle([
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            
+            # Create table
+            table = Table(
+                table_data,
+                colWidths=[0.3*inch, 1.5*inch, 0.7*inch, 0.8*inch, 0.8*inch, 0.7*inch, 0.8*inch, 0.8*inch, 0.7*inch]
+            )
+            
+            # Table styling
+            table_style = [
+                # Header
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2E3192')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ]))
-
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                
+                # Body
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+            ]
+            
+            table.setStyle(TableStyle(table_style))
             story.append(table)
+            
+            # Footer with statistics
+            story.append(Spacer(1, 0.3*inch))
+            
+            total_records = len(attendance_data)
+            present_count = attendance_data['is_present'].sum() if 'is_present' in attendance_data else 0
+            
+            footer_text = f"""
+            <b>Summary:</b><br/>
+            • Total Records: {total_records}<br/>
+            • Present: {present_count}<br/>
+            • Total Salary Paid: Rs. {total_salary_sum:.2f}
+            """
+            footer_para = Paragraph(footer_text, self.normal_style)
+            story.append(footer_para)
+            
+            # Build PDF
             doc.build(story)
+            
             buffer.seek(0)
             return buffer.getvalue()
-
+            
         except Exception as e:
-            print("Daily PDF error:", e)
+            print(f"Error generating daily report: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
-    def generate_range_report(self, attendance_data: pd.DataFrame, start_date: str, end_date: str, user_name: Optional[str] = None):
+    def generate_user_range_report(
+        self,
+        attendance_data: pd.DataFrame,
+        start_date: str,
+        end_date: str,
+        user_name: str
+    ) -> Optional[bytes]:
+        """
+        ✅ Generate date range report for SINGLE USER with salary calculations
+        Shows ALL records including absent days
+        Columns: Name, Date, Check In, Check Out, Hours, Salary, Total, Status
+        Includes GRAND TOTAL at the end
+        
+        Args:
+            attendance_data: DataFrame with user's attendance records (must include 'salary' column)
+            start_date: Start date in DD/MM format
+            end_date: End date in DD/MM format
+            user_name: User's name
+        
+        Returns:
+            PDF as bytes or None if failed
+        """
         try:
             buffer = io.BytesIO()
-            doc = SimpleDocTemplate(buffer, pagesize=A4, margin=36)
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=A4,
+                topMargin=0.5*inch,
+                bottomMargin=0.5*inch,
+                leftMargin=0.5*inch,
+                rightMargin=0.5*inch
+            )
+            
             story = []
-
+            
+            # Header
+            title = f"Attendance Report - {user_name}"
             subtitle = f"<b>Period:</b> {start_date} to {end_date}"
-            if user_name:
-                subtitle += f" | <b>User:</b> {user_name}"
-
-            story.extend(self._create_header("Attendance Report", subtitle))
-
-            table_data = [['#', 'Name', 'Date', 'Hours', 'Salary', 'Total', 'Status']]
-            idx = 1
-
-            for _, row in attendance_data.iterrows():
-                hours = self._calculate_hours(row.get('checked_in_time'), row.get('checked_out_time'))
+            
+            story.extend(self._create_header(title, subtitle))
+            
+            # ✅ Table header with Salary and Total columns
+            table_data = [['#', 'Name', 'Date', 'Check In', 'Check Out', 'Hours', 'Salary', 'Total', 'Status']]
+            
+            grand_total = 0.0
+            total_hours = 0.0
+            present_count = 0
+            absent_count = 0
+            
+            for idx, row in attendance_data.iterrows():
+                # Get times
+                check_in = row.get('checked_in_time', 'N/A')
+                check_out = row.get('checked_out_time', 'N/A')
+                
+                # Calculate hours
+                hours = self._calculate_hours(check_in, check_out)
+                hours_str = self._format_hours(hours)
+                total_hours += hours
+                
+                # Status
+                is_present = row.get('is_present', False)
+                status = "Present" if is_present else "Absent"
+                
+                if is_present:
+                    present_count += 1
+                else:
+                    absent_count += 1
+                
+                # ✅ Get salary and calculate daily total
                 salary = row.get('salary')
-                total = self._calculate_total_salary(salary, hours)
-
+                salary_str = f"{float(salary):.2f}" if salary is not None and salary > 0 else ""
+                
+                daily_total = self._calculate_daily_salary(salary, check_in, check_out)
+                total_str = f"{daily_total:.2f}" if daily_total > 0 else ""
+                
+                grand_total += daily_total
+                
                 table_data.append([
-                    idx,
-                    row['name'],
-                    row['date'],
-                    hours,
-                    "" if salary is None else f"{salary:.2f}",
-                    total,
-                    "Present" if row.get('is_present') else "Absent"
+                    str(idx + 1),
+                    str(row['name']),
+                    str(row['date']),
+                    check_in if check_in and check_in != 'N/A' else 'N/A',
+                    check_out if check_out and check_out != 'N/A' else 'N/A',
+                    hours_str,
+                    salary_str,
+                    total_str,
+                    status
                 ])
-                idx += 1
-
-            table = Table(table_data, repeatRows=1)
-            table.setStyle(TableStyle([
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            
+            # Create table
+            table = Table(
+                table_data,
+                colWidths=[0.3*inch, 1.5*inch, 0.7*inch, 0.8*inch, 0.8*inch, 0.7*inch, 0.8*inch, 0.8*inch, 0.7*inch]
+            )
+            
+            # Table styling
+            table_style = [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2E3192')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONT', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ]))
-
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 8),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+            ]
+            
+            table.setStyle(TableStyle(table_style))
             story.append(table)
+            
+            # ✅ Summary at the end with GRAND TOTAL
+            story.append(Spacer(1, 0.3*inch))
+            
+            total_days = len(attendance_data)
+            avg_hours = total_hours / total_days if total_days > 0 else 0
+            
+            summary_text = f"""
+            <b>Summary Statistics:</b><br/>
+            • Total Days: {total_days}<br/>
+            • Present: {present_count}<br/>
+            • Absent: {absent_count}<br/>
+            • Total Hours: {total_hours:.2f}h<br/>
+            • Average Hours/Day: {avg_hours:.2f}h<br/>
+            • <b>GRAND TOTAL SALARY: Rs. {grand_total:.2f}</b>
+            """
+            
+            summary_para = Paragraph(summary_text, self.normal_style)
+            story.append(summary_para)
+            
+            # Build PDF
             doc.build(story)
+            
             buffer.seek(0)
             return buffer.getvalue()
-
+            
         except Exception as e:
-            print("Range PDF error:", e)
+            print(f"Error generating user range report: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
-    def generate_user_range_report(self, attendance_data, start_date, end_date, user_name):
-
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
-        story = []
-
-        story.append(Paragraph(f"Attendance Report – {user_name}", self.title_style))
-        story.append(Spacer(1, 0.2 * inch))
-
-        headers = ['#', 'Date', 'In', 'Out', 'Hours', 'Salary', 'Total', 'Status']
-        table_data = [headers]
-
-        grand_total = 0
-        idx = 1
-
-        for _, row in attendance_data.iterrows():
-            hours = self._calculate_hours(row.get('checked_in_time'), row.get('checked_out_time'))
-            total = self._calculate_salary(row.get('salary'), hours)
-
-            if isinstance(total, (int, float)):
-                grand_total += total
-
-            table_data.append([
-                idx,
-                row['date'],
-                row.get('checked_in_time') or '',
-                row.get('checked_out_time') or '',
-                hours if hours else '',
-                row.get('salary') if row.get('salary') else '',
-                total,
-                "Present" if row.get('is_present') else "Absent"
-            ])
-            idx += 1
-
-        table = Table(table_data, repeatRows=1)
-        table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2E3192')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ]))
-
-        story.append(table)
-        story.append(Spacer(1, 0.3 * inch))
-        story.append(Paragraph(f"<b>Total Pay:</b> {round(grand_total, 2)}", self.normal_style))
-
-        doc.build(story)
-        buffer.seek(0)
-        return buffer.getvalue()
-    
-    def generate_combined_users_summary(self, attendance_data, start_date, end_date):
-
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
-        story = []
-
-        story.append(Paragraph("Combined Salary Summary", self.title_style))
-        story.append(Spacer(1, 0.2 * inch))
-
-        headers = ['#', 'Employee', 'Salary (Daily)', 'Total Amount']
-        table_data = [headers]
-
-        idx = 1
-        for user_id in attendance_data['user_id'].unique():
-            user_rows = attendance_data[attendance_data['user_id'] == user_id]
-
-            salary = user_rows.iloc[0].get('salary')
-            total_amount = 0
-
-            for _, row in user_rows.iterrows():
-                hours = self._calculate_hours(row.get('checked_in_time'), row.get('checked_out_time'))
-                daily_total = self._calculate_total_salary(salary, hours)
-                if isinstance(daily_total, (int, float)):
-                    total_amount += daily_total
-
-            table_data.append([
-                idx,
-                user_rows.iloc[0]['name'],
-                salary if salary else '',
-                round(total_amount, 2)
-            ])
-            idx += 1
-
-        table = Table(table_data, repeatRows=1)
-        table.setStyle(TableStyle([
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2E3192')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ]))
-
-        story.append(table)
-        doc.build(story)
-        buffer.seek(0)
-        return buffer.getvalue()
+    def generate_combined_users_summary(
+        self,
+        attendance_data: pd.DataFrame,
+        start_date: str,
+        end_date: str
+    ) -> Optional[bytes]:
+        """
+        ✅ Generate date range summary for ALL USERS COMBINED with salary calculations
+        One row per user with: Employee, Salary (Daily), Present Days, Absent Days, Total Salary
+        Total Salary = Sum of daily salaries for all days in range using the formula
+        
+        Args:
+            attendance_data: DataFrame with all users' attendance records (must include 'salary' column)
+            start_date: Start date in DD/MM format
+            end_date: End date in DD/MM format
+        
+        Returns:
+            PDF as bytes or None if failed
+        """
+        try:
+            buffer = io.BytesIO()
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=A4,
+                topMargin=0.5*inch,
+                bottomMargin=0.5*inch,
+                leftMargin=0.5*inch,
+                rightMargin=0.5*inch
+            )
+            
+            story = []
+            
+            # Header
+            title = "Attendance Summary Report - All Employees"
+            subtitle = f"<b>Period:</b> {start_date} to {end_date}"
+            
+            story.extend(self._create_header(title, subtitle))
+            
+            # ✅ Calculate summary for each user
+            summary_data = []
+            
+            for user_id in attendance_data['user_id'].unique():
+                user_records = attendance_data[attendance_data['user_id'] == user_id]
+                
+                if user_records.empty:
+                    continue
+                
+                employee_name = user_records.iloc[0]['name']
+                
+                # Get salary (should be same for all records of this user)
+                salary = user_records.iloc[0].get('salary')
+                salary_value = float(salary) if salary is not None and salary > 0 else 0.0
+                
+                # Count present/absent days
+                present_days = user_records['is_present'].sum() if 'is_present' in user_records else 0
+                total_days = len(user_records)
+                absent_days = total_days - present_days
+                
+                # ✅ Calculate total salary for this employee in the range
+                total_salary_earned = 0.0
+                
+                for _, row in user_records.iterrows():
+                    check_in = row.get('checked_in_time')
+                    check_out = row.get('checked_out_time')
+                    
+                    daily_total = self._calculate_daily_salary(salary_value, check_in, check_out)
+                    total_salary_earned += daily_total
+                
+                summary_data.append({
+                    'employee': employee_name,
+                    'salary': salary_value,
+                    'present': present_days,
+                    'absent': absent_days,
+                    'total_salary': total_salary_earned
+                })
+            
+            # Create table
+            table_data = [['#', 'Employee', 'Salary (Daily)', 'Present Days', 'Absent Days', 'Total Salary']]
+            
+            grand_total_paid = 0.0
+            
+            for idx, summary in enumerate(summary_data, 1):
+                salary_str = f"{summary['salary']:.2f}" if summary['salary'] > 0 else ""
+                total_str = f"{summary['total_salary']:.2f}" if summary['total_salary'] > 0 else "0.00"
+                
+                grand_total_paid += summary['total_salary']
+                
+                table_data.append([
+                    str(idx),
+                    summary['employee'],
+                    salary_str,
+                    str(summary['present']),
+                    str(summary['absent']),
+                    total_str
+                ])
+            
+            # Create table
+            table = Table(
+                table_data,
+                colWidths=[0.4*inch, 2.5*inch, 1.2*inch, 1.2*inch, 1.2*inch, 1.2*inch]
+            )
+            
+            # Table styling
+            table_style = [
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2E3192')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+            ]
+            
+            table.setStyle(TableStyle(table_style))
+            story.append(table)
+            
+            # Overall summary
+            story.append(Spacer(1, 0.3*inch))
+            
+            total_employees = len(summary_data)
+            total_present = sum(s['present'] for s in summary_data)
+            total_absent = sum(s['absent'] for s in summary_data)
+            
+            summary_text = f"""
+            <b>Overall Statistics:</b><br/>
+            • Total Employees: {total_employees}<br/>
+            • Total Present Days: {total_present}<br/>
+            • Total Absent Days: {total_absent}<br/>
+            • <b>TOTAL PAID TO ALL EMPLOYEES: Rs. {grand_total_paid:.2f}</b>
+            """
+            
+            summary_para = Paragraph(summary_text, self.normal_style)
+            story.append(summary_para)
+            
+            # Build PDF
+            doc.build(story)
+            
+            buffer.seek(0)
+            return buffer.getvalue()
+            
+        except Exception as e:
+            print(f"Error generating combined users summary: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
