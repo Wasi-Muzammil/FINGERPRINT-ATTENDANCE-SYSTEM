@@ -1135,46 +1135,71 @@ class PDFManager:
             total_hours = 0.0
             present_count = 0
             absent_count = 0
-            
-            for idx, row in attendance_data.iterrows():
-                # Get times
-                check_in = row.get('checked_in_time', 'N/A')
-                check_out = row.get('checked_out_time', 'N/A')
-                
-                # Calculate hours
-                hours = self._calculate_hours(check_in, check_out)
-                hours_str = self._format_hours(hours)
-                total_hours += hours
-                
+
+            # 🔧 NEW: build complete date range
+            start_dt = datetime.strptime(start_date, "%Y/%m/%d").date()
+            end_dt = datetime.strptime(end_date, "%Y/%m/%d").date()
+
+            all_dates = pd.date_range(start=start_dt, end=end_dt)
+
+            # Map existing attendance by date
+            attendance_map = {
+                str(row['date']): row
+                for _, row in attendance_data.iterrows()
+            }
+            row_index = 1
+
+            for current_date in all_dates:
+                date_str = current_date.strftime("%Y/%m/%d")
+                row = attendance_map.get(date_str)
+
+                if row is not None:
+                    # ✅ PRESENT DAY (existing logic)
+                    check_in = row.get('checked_in_time', 'N/A')
+                    check_out = row.get('checked_out_time', 'N/A')
+                    is_present = row.get('is_present', False)
+                    salary = row.get('salary')
+                    name = row['name']
+                else:
+                    # ❌ ABSENT DAY (synthesized row)
+                    check_in = 'N/A'
+                    check_out = 'N/A'
+                    is_present = False
+                    salary = attendance_data.iloc[0].get('salary') if not attendance_data.empty else None
+                    name = user_name
+
                 # Status
-                is_present = row.get('is_present', False)
                 status = "Present" if is_present else "Absent"
-                
+
                 if is_present:
                     present_count += 1
                 else:
                     absent_count += 1
-                
-                # ✅ Get salary and calculate daily total
-                salary = row.get('salary')
+
+                # Hours & salary
+                hours = self._calculate_hours(check_in, check_out)
+                hours_str = self._format_hours(hours)
+                total_hours += hours
+
                 salary_str = f"{float(salary):.2f}" if salary is not None and salary > 0 else ""
-                
                 daily_total = self._calculate_daily_salary(salary, check_in, check_out)
                 total_str = f"{daily_total:.2f}" if daily_total > 0 else ""
-                
+
                 grand_total += daily_total
-                
+
                 table_data.append([
-                    str(idx + 1),
-                    str(row['name']),
-                    str(row['date']),
-                    check_in if check_in and check_in != 'N/A' else 'N/A',
-                    check_out if check_out and check_out != 'N/A' else 'N/A',
+                    str(row_index),
+                    name,
+                    date_str,
+                    check_in,
+                    check_out,
                     hours_str,
                     salary_str,
                     total_str,
                     status
                 ])
+
+                row_index += 1
             
             # Create table
             table = Table(
