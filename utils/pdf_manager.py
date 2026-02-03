@@ -952,7 +952,8 @@ class PDFManager:
             return 0.0
         
         # Formula: (Salary / 8) * hours_worked
-        hourly_rate = salary / 8.0
+        salary_value = float(salary)
+        hourly_rate = salary_value / 8.0
         daily_total = hourly_rate * hours_worked
         
         return daily_total
