@@ -1085,7 +1085,7 @@ class PDFManager:
 
             for _, row in user_rows.iterrows():
                 hours = self._calculate_hours(row.get('checked_in_time'), row.get('checked_out_time'))
-                daily_total = self._calculate_salary(salary, hours)
+                daily_total = self._calculate_total_salary(salary, hours)
                 if isinstance(daily_total, (int, float)):
                     total_amount += daily_total
 
