@@ -1097,8 +1097,6 @@ class PDFManager:
         """
         ✅ Generate date range report for SINGLE USER with salary calculations
         Shows ALL records including absent days
-        Columns: Name, Date, Check In, Check Out, Hours, Salary, Total, Status
-        Includes GRAND TOTAL at the end
         """
         try:
             buffer = io.BytesIO()
@@ -1113,21 +1111,26 @@ class PDFManager:
 
             story = []
 
-            # Header
             title = f"Attendance Report - {user_name}"
             subtitle = f"<b>Period:</b> {start_date} to {end_date}"
             story.extend(self._create_header(title, subtitle))
 
-            # Table header
             table_data = [
                 ['#', 'Name', 'Date', 'Check In', 'Check Out', 'Hours', 'Salary', 'Total', 'Status']
             ]
 
             # ==========================
-            # 🔧 NEW LOGIC: FULL DATE RANGE
+            # ✅ FIXED DATE PARSING (DD/MM)
             # ==========================
-            start_dt = datetime.strptime(start_date, "%Y/%m/%d").date()
-            end_dt = datetime.strptime(end_date, "%Y/%m/%d").date()
+            current_year = datetime.now().year
+
+            start_dt = datetime.strptime(f"{start_date}/{current_year}", "%d/%m/%Y").date()
+            end_dt = datetime.strptime(f"{end_date}/{current_year}", "%d/%m/%Y").date()
+
+            # Handle year rollover (e.g. 27/12 → 03/01)
+            if end_dt < start_dt:
+                end_dt = end_dt.replace(year=current_year + 1)
+
             all_dates = pd.date_range(start=start_dt, end=end_dt)
 
             attendance_map = {
@@ -1141,19 +1144,17 @@ class PDFManager:
             absent_count = 0
             row_index = 1
 
-            for current_date in all_dates:
-                date_str = current_date.strftime("%Y/%m/%d")
+            for day in all_dates:
+                date_str = day.strftime("%d/%m")
                 row = attendance_map.get(date_str)
 
                 if row is not None:
-                    # PRESENT DAY
                     check_in = row.get('checked_in_time', 'N/A')
                     check_out = row.get('checked_out_time', 'N/A')
                     is_present = row.get('is_present', False)
                     salary = row.get('salary')
                     name = row.get('name', user_name)
                 else:
-                    # ABSENT DAY (synthesized)
                     check_in = 'N/A'
                     check_out = 'N/A'
                     is_present = False
@@ -1168,8 +1169,8 @@ class PDFManager:
                     absent_count += 1
 
                 hours = self._calculate_hours(check_in, check_out)
-                hours_str = self._format_hours(hours)
                 total_hours += hours
+                hours_str = self._format_hours(hours)
 
                 salary_str = f"{float(salary):.2f}" if salary is not None and salary > 0 else ""
                 daily_total = self._calculate_daily_salary(salary, check_in, check_out)
@@ -1191,7 +1192,6 @@ class PDFManager:
 
                 row_index += 1
 
-            # Create table
             table = Table(
                 table_data,
                 colWidths=[
@@ -1201,30 +1201,23 @@ class PDFManager:
                 ]
             )
 
-            table_style = [
+            table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2E3192')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, 0), 9),
-                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
                 ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-                ('FONTSIZE', (0, 1), (-1, -1), 8),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
-            ]
+            ]))
 
-            table.setStyle(TableStyle(table_style))
             story.append(table)
-
-            # Summary
             story.append(Spacer(1, 0.3 * inch))
 
             total_days = len(all_dates)
-            avg_hours = total_hours / total_days if total_days > 0 else 0
+            avg_hours = total_hours / total_days if total_days else 0
 
-            summary_text = f"""
+            story.append(Paragraph(f"""
             <b>Summary Statistics:</b><br/>
             • Total Days: {total_days}<br/>
             • Present: {present_count}<br/>
@@ -1232,9 +1225,7 @@ class PDFManager:
             • Total Hours: {total_hours:.2f}h<br/>
             • Average Hours/Day: {avg_hours:.2f}h<br/>
             • <b>GRAND TOTAL SALARY: Rs. {grand_total:.2f}</b>
-            """
-
-            story.append(Paragraph(summary_text, self.normal_style))
+            """, self.normal_style))
 
             doc.build(story)
             buffer.seek(0)
@@ -1245,6 +1236,7 @@ class PDFManager:
             import traceback
             traceback.print_exc()
             return None
+
 
     
     def generate_combined_users_summary(
