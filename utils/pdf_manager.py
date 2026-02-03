@@ -1099,54 +1099,46 @@ class PDFManager:
         Shows ALL records including absent days
         Columns: Name, Date, Check In, Check Out, Hours, Salary, Total, Status
         Includes GRAND TOTAL at the end
-        
-        Args:
-            attendance_data: DataFrame with user's attendance records (must include 'salary' column)
-            start_date: Start date in DD/MM format
-            end_date: End date in DD/MM format
-            user_name: User's name
-        
-        Returns:
-            PDF as bytes or None if failed
         """
         try:
             buffer = io.BytesIO()
             doc = SimpleDocTemplate(
                 buffer,
                 pagesize=A4,
-                topMargin=0.5*inch,
-                bottomMargin=0.5*inch,
-                leftMargin=0.5*inch,
-                rightMargin=0.5*inch
+                topMargin=0.5 * inch,
+                bottomMargin=0.5 * inch,
+                leftMargin=0.5 * inch,
+                rightMargin=0.5 * inch
             )
-            
+
             story = []
-            
+
             # Header
             title = f"Attendance Report - {user_name}"
             subtitle = f"<b>Period:</b> {start_date} to {end_date}"
-            
             story.extend(self._create_header(title, subtitle))
-            
-            # ✅ Table header with Salary and Total columns
-            table_data = [['#', 'Name', 'Date', 'Check In', 'Check Out', 'Hours', 'Salary', 'Total', 'Status']]
-            
-            grand_total = 0.0
-            total_hours = 0.0
-            present_count = 0
-            absent_count = 0
 
-            # 🔧 NEW: build complete date range
+            # Table header
+            table_data = [
+                ['#', 'Name', 'Date', 'Check In', 'Check Out', 'Hours', 'Salary', 'Total', 'Status']
+            ]
+
+            # ==========================
+            # 🔧 NEW LOGIC: FULL DATE RANGE
+            # ==========================
             start_dt = datetime.strptime(start_date, "%Y/%m/%d").date()
             end_dt = datetime.strptime(end_date, "%Y/%m/%d").date()
-
             all_dates = pd.date_range(start=start_dt, end=end_dt)
 
-            # Map existing attendance by date
             attendance_map = {
                 str(row['date']): row
                 for _, row in attendance_data.iterrows()
             }
+
+            grand_total = 0.0
+            total_hours = 0.0
+            present_count = 0
+            absent_count = 0
             row_index = 1
 
             for current_date in all_dates:
@@ -1154,21 +1146,20 @@ class PDFManager:
                 row = attendance_map.get(date_str)
 
                 if row is not None:
-                    # ✅ PRESENT DAY (existing logic)
+                    # PRESENT DAY
                     check_in = row.get('checked_in_time', 'N/A')
                     check_out = row.get('checked_out_time', 'N/A')
                     is_present = row.get('is_present', False)
                     salary = row.get('salary')
-                    name = row['name']
+                    name = row.get('name', user_name)
                 else:
-                    # ❌ ABSENT DAY (synthesized row)
+                    # ABSENT DAY (synthesized)
                     check_in = 'N/A'
                     check_out = 'N/A'
                     is_present = False
                     salary = attendance_data.iloc[0].get('salary') if not attendance_data.empty else None
                     name = user_name
 
-                # Status
                 status = "Present" if is_present else "Absent"
 
                 if is_present:
@@ -1176,7 +1167,6 @@ class PDFManager:
                 else:
                     absent_count += 1
 
-                # Hours & salary
                 hours = self._calculate_hours(check_in, check_out)
                 hours_str = self._format_hours(hours)
                 total_hours += hours
@@ -1200,14 +1190,17 @@ class PDFManager:
                 ])
 
                 row_index += 1
-            
+
             # Create table
             table = Table(
                 table_data,
-                colWidths=[0.3*inch, 1.5*inch, 0.7*inch, 0.8*inch, 0.8*inch, 0.7*inch, 0.8*inch, 0.8*inch, 0.7*inch]
+                colWidths=[
+                    0.3 * inch, 1.5 * inch, 0.7 * inch,
+                    0.8 * inch, 0.8 * inch, 0.7 * inch,
+                    0.8 * inch, 0.8 * inch, 0.7 * inch
+                ]
             )
-            
-            # Table styling
+
             table_style = [
                 ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2E3192')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -1221,16 +1214,16 @@ class PDFManager:
                 ('FONTSIZE', (0, 1), (-1, -1), 8),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
             ]
-            
+
             table.setStyle(TableStyle(table_style))
             story.append(table)
-            
-            # ✅ Summary at the end with GRAND TOTAL
-            story.append(Spacer(1, 0.3*inch))
-            
-            total_days = len(attendance_data)
+
+            # Summary
+            story.append(Spacer(1, 0.3 * inch))
+
+            total_days = len(all_dates)
             avg_hours = total_hours / total_days if total_days > 0 else 0
-            
+
             summary_text = f"""
             <b>Summary Statistics:</b><br/>
             • Total Days: {total_days}<br/>
@@ -1240,21 +1233,19 @@ class PDFManager:
             • Average Hours/Day: {avg_hours:.2f}h<br/>
             • <b>GRAND TOTAL SALARY: Rs. {grand_total:.2f}</b>
             """
-            
-            summary_para = Paragraph(summary_text, self.normal_style)
-            story.append(summary_para)
-            
-            # Build PDF
+
+            story.append(Paragraph(summary_text, self.normal_style))
+
             doc.build(story)
-            
             buffer.seek(0)
             return buffer.getvalue()
-            
+
         except Exception as e:
             print(f"Error generating user range report: {e}")
             import traceback
             traceback.print_exc()
             return None
+
     
     def generate_combined_users_summary(
         self,
