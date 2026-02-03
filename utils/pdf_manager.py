@@ -1201,15 +1201,22 @@ class PDFManager:
                 ]
             )
 
-            table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2E3192')),
-                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 9),
-                ('GRID', (0, 0), (-1, -1), 1, colors.black),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
-            ]))
+            # Table styling 
+            table_style = [ 
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2E3192')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke), 
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'), 
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'), 
+            ('FONTSIZE', (0, 0), (-1, 0), 9), 
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12), 
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige), 
+            ('GRID', (0, 0), (-1, -1), 1, colors.black), 
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'), 
+            ('FONTSIZE', (0, 1), (-1, -1), 8), 
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), 
+            [colors.white, colors.lightgrey]) 
+            ]
+            table.setStyle(TableStyle(table_style))
 
             story.append(table)
             story.append(Spacer(1, 0.3 * inch))
