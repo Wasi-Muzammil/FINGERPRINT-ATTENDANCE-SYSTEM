@@ -1081,6 +1081,69 @@ def manage_users_tab():
                         st.rerun()
                     else:
                         st.error(f"❌ {message}")
+    
+    st.markdown("---")
+    
+    # ==================== NEW SYNC ATTENDANCE SECTION ====================
+    st.markdown("#### 🔄 Sync Attendance")
+    
+    st.info("📋 Trigger ESP32 to upload attendance logs from the last N days. This ensures no check-out logs are missed during internet outages.")
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        sync_days = st.number_input(
+            "Number of Days to Sync",
+            min_value=1,
+            max_value=30,
+            value=7,
+            step=1,
+            help="Select how many days of attendance logs to sync from ESP32 (1-30 days)"
+        )
+    
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)  # Spacing
+        trigger_sync_btn = st.button("🚀 Trigger Sync", use_container_width=True, type="primary")
+    
+    if trigger_sync_btn:
+        with st.spinner(f"Triggering sync for last {sync_days} days..."):
+            device_id = "ESP32_MAIN"  # You can make this configurable if needed
+            success, response = api_client.trigger_attendance_sync(device_id, sync_days)
+            
+            if success:
+                st.success(f"✅ Sync triggered successfully!")
+                st.info(f"📡 ESP32 will upload attendance logs from the last **{sync_days} days**")
+                st.json(response)  # Show response details
+            else:
+                st.error(f"❌ Failed to trigger sync: {response.get('message', 'Unknown error')}")
+    
+    # Show sync history
+    with st.expander("📜 View Sync History", expanded=False):
+        success, history = api_client.get_sync_history("ESP32_MAIN", limit=10)
+        
+        if success and history and 'history' in history:
+            sync_history = history['history']
+            
+            if sync_history:
+                history_data = []
+                for record in sync_history:
+                    status_emoji = "✅" if record['status'] == 'completed' else "❌" if record['status'] == 'failed' else "⏳"
+                    
+                    history_data.append({
+                        'Status': f"{status_emoji} {record['status'].capitalize()}",
+                        'Days Synced': record['days_synced'],
+                        'Logs Uploaded': record['logs_synced'],
+                        'Triggered At': record['triggered_at'],
+                        'Completed At': record.get('completed_at', 'Pending'),
+                        'Error': record.get('error_message', '-')
+                    })
+                
+                history_df = pd.DataFrame(history_data)
+                st.dataframe(history_df, hide_index=True, use_container_width=True)
+            else:
+                st.info("No sync history found.")
+        else:
+            st.warning("Could not fetch sync history.")
 
 # ==================== ATTENDANCE REPORTS TAB ====================
 
