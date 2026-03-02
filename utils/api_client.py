@@ -365,7 +365,7 @@ class APIClient:
             }
             
             response = requests.post(
-                f"{self.base_url}/esp32/trigger-attendance-sync",
+                f"{self.base_url}/esp32/attendance/esp32/trigger-attendance-sync",
                 json=payload,
                 timeout=10
             )
@@ -391,7 +391,7 @@ class APIClient:
         """
         try:
             response = requests.get(
-                f"{self.base_url}/esp32/sync-history/{device_id}",
+                f"{self.base_url}/esp32/attendance/esp32/sync-history/{device_id}",
                 params={"limit": limit},
                 timeout=10
             )
