@@ -16,6 +16,8 @@ streamlit-option-menu
 # Database & ORM
 sqlalchemy
 psycopg2-binary
+psycopg[binary]
+
 
 # PDF Generation
 reportlab

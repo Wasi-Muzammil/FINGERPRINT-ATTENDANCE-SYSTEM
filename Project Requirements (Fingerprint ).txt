@@ -1,0 +1,52 @@
+Project Requirements (Fingerprint based Attendance System) :
+
+1) An accurate fingerprint sensor.
+
+2) RTC (real time clock) integration for accurate timings even if the power is turned off.
+
+3) A LCD/TFT display that can show real time (name) for the user that just used the fingerprint sensor , and information like (Access denied) OR (Welcome) or stuff like that .
+
+4) Microcontroller ESP32 S3 will be used as the brain of the project with integrated wifi capabilities.
+
+5) An MicroSD card for local storage until the wifi is connected , if connected then we will integrate cloud database like (MySQL or firebase).
+
+6) There will be two modes of operation:
+	
+	1) when new record(fingerprint) is registered.
+	2) when sensor is checking for existing fingerprints.
+   Both modes can be shuffled by an external switch to switch modes or by other means.
+
+7) A flask OR Django web interface for admin to view daily attendance of workers , download PDFs , export to excel files
+
+8) Wall Power Adaptor (12v 2A) minimum with buck convertors for steping down.
+
+9) 3.7v Li-ion battery pack for backup which can be boosted to required voltage level with the help of boost convertors.
+
+10) Casing for the machine.  
+ 
+_________________________
+
+Components Requirements:-
+_________________________
+
+
+1) R503 Fingerprint Sensor.
+2) DS3231 RTC module.
+3) 3.5 inches touchscreen TFT panel.
+4) Espressif ESP32 S3-devkit-C1.
+5) Robodo MO20 Micro SD Card Module.
+6) Buck Converter 10A. 
+7) BMS 3S2P.
+8) 3.7v Li-ion battery pack.
+9) 16-key KeyPad.
+10) PCF8574 PCF8574T I/O Expansion Module.
+11) JST connectors.
+12) jumper wires.
+13) Veroboards.
+14) Header-Pins (Male,Female).
+15) 3-way Switch.
+16) MBR1045 Schottky Diode.
+17) Flux.
+18) Soldering Wire.
+19) Desoldering Wire.
+
